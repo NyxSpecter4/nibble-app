@@ -1,4 +1,4 @@
-// Nibble — software-only v0.1
+// Nibble — software-only v0.1.1
 // Offline PWA. Installable on Android (Add to Home Screen).
 // Uses embedded core pack. Honest refusal outside pack.
 
@@ -23,12 +23,18 @@ function save() {
   localStorage.setItem("nibble-bests", JSON.stringify(bests));
 }
 
+function norm(s) {
+  return s.toLowerCase().replace(/[^a-z0-9°]+/g, " ").trim();
+}
+
 function matchClaim(text) {
-  const t = text.toLowerCase().trim();
+  const t = norm(text);
   if (!t) return null;
+  // Exact normalized match first — handles numeric/short claims the word filter misses (e.g. "2 + 2 = 4").
+  for (const c of PACK) if (norm(c.claim) === t) return c;
   let best = null, score = 0;
   for (const c of PACK) {
-    const words = c.claim.toLowerCase().split(/\W+/);
+    const words = norm(c.claim).split(" ");
     let s = 0;
     for (const w of words) if (w.length > 3 && t.includes(w)) s++;
     if (s > score) { score = s; best = c; }
@@ -74,7 +80,7 @@ function render() {
     };
   } else if (tab === "play") {
     app.innerHTML = `
-      <div class="card"><h3>Claim or Not</h3><p class="muted">10 timed calls. Evidence after.</p><button class="primary" data-game="con">Start</button></div>
+      <div class="card"><h3>Claim or Not</h3><p class="muted">5 verdict calls. Evidence after each.</p><button class="primary" data-game="con">Start</button></div>
       <div class="card"><h3>Proof Hunt</h3><p class="muted">Find the blanked field.</p><button class="primary" data-game="ph">Start</button></div>
       <div class="card"><h3>Falsify It</h3><p class="muted">Pick what would kill the claim.</p><button class="primary" data-game="fi">Start</button></div>
       <div id="game"></div>`;
@@ -111,9 +117,16 @@ function startGame(type) {
         <button class="primary" data-v="refuted">Refuted</button>
         <button class="primary" data-v="context">Context</button></div>`;
       g.querySelectorAll("button").forEach(btn => btn.onclick = () => {
-        if (btn.dataset.v === c.verdict) score++;
-        i++;
-        run();
+        const right = btn.dataset.v === c.verdict;
+        if (right) score++;
+        g.innerHTML = `<div class="card">
+          <div><span class="badge ${c.verdict}">${c.verdict}</span> <span class="muted">${right ? "Correct" : "Not quite"}</span></div>
+          <p><strong>Claim</strong><br>${c.claim}</p>
+          <p><strong>Blast radius</strong><br>${c.blast}</p>
+          <p><strong>How to check it</strong><br>${c.check}</p>
+          <p><strong>What would kill it</strong><br>${c.falsify}</p>
+          <button class="primary" id="next">Next</button></div>`;
+        document.getElementById("next").onclick = () => { i++; run(); };
       });
     };
     run();
